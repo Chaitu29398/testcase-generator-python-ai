@@ -1,0 +1,6 @@
+flask
+pymupdf
+python-docx
+openpyxl
+google-generativeai
+fitz

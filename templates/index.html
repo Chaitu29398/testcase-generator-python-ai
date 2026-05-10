@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test Case Generator</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>🛡️ Test Case Generator</h1>
+    <p>Upload FRS / BRD / SRS → AI generates test cases → Download Excel</p>
+    <div class="badges">
+      <span class="badge pam">PAM</span>
+      <span class="badge ci">CI</span>
+      <span class="badge epm">EPM</span>
+      <span class="badge vault">MyVault</span>
+    </div>
+  </div>
+
+  <!-- Step 1: Product -->
+  <div class="card">
+    <div class="step-label">Step 1 — Select Product</div>
+    <div class="product-grid">
+      <button class="product-btn active" data-product="PAM">🔐 PAM</button>
+      <button class="product-btn" data-product="CI">🔍 CI</button>
+      <button class="product-btn" data-product="EPM">🛡️ EPM</button>
+      <button class="product-btn" data-product="MyVault">🗄️ MyVault</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Upload -->
+  <div class="card">
+    <div class="step-label">Step 2 — Upload Requirement Document (Optional)</div>
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-icon">📄</div>
+      <div class="upload-text">Drop your file here or click to browse</div>
+      <div class="upload-subtext">Supports PDF, DOCX, TXT, XLSX, CSV</div>
+      <input type="file" id="fileInput" accept=".pdf,.docx,.txt,.xlsx,.csv"/>
+    </div>
+    <div id="fileInfo" class="file-info hidden">
+      <span id="fileName"></span>
+      <button id="removeFile">✕ Remove</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Feature -->
+  <div class="card">
+    <div class="step-label">Step 3 — Describe Feature / Module to Test</div>
+    <textarea
+      id="featureInput"
+      rows="3"
+      placeholder="e.g. MFA login for PAM admin users, vault password checkout flow, session recording, EPM elevation request approval...">
+    </textarea>
+  </div>
+
+  <!-- Step 4: Options -->
+  <div class="card">
+    <div class="step-label">Step 4 — Options</div>
+    <div class="options-grid">
+      <div class="option-group">
+        <label>Test Type</label>
+        <select id="testType">
+          <option value="all">All Types (Recommended)</option>
+          <option value="functional">Functional</option>
+          <option value="security">Security</option>
+          <option value="negative">Negative</option>
+          <option value="boundary">Boundary</option>
+          <option value="regression">Regression</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label>Number of Test Cases</label>
+        <input type="number" id="tcCount" value="15" min="5" max="50"/>
+      </div>
+      <div class="option-group">
+        <label>Priority Focus</label>
+        <select id="priority">
+          <option value="all">All Priorities</option>
+          <option value="high">High Priority Only</option>
+          <option value="critical">Critical Only</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate Button -->
+  <button class="generate-btn" id="generateBtn">
+    ⚡ Generate Test Cases
+  </button>
+
+  <!-- Status -->
+  <div class="status-bar hidden" id="statusBar">
+    <div class="spinner"></div>
+    <span id="statusText">AI is analyzing and generating test cases...</span>
+  </div>
+
+  <!-- Error -->
+  <div class="error-bar hidden" id="errorBar">
+    <span>❌</span>
+    <span id="errorText"></span>
+  </div>
+
+  <!-- Results -->
+  <div class="card hidden" id="resultCard">
+    <div class="result-header">
+      <div>
+        <div class="result-title" id="resultTitle">Test Cases Generated</div>
+        <div class="result-meta" id="resultMeta"></div>
+      </div>
+      <a id="downloadBtn" href="#" class="download-btn">⬇ Download Excel</a>
+    </div>
+
+    <!-- Preview Table -->
+    <div class="table-wrapper">
+      <table class="preview-table" id="previewTable">
+        <thead>
+          <tr>
+            <th>TC ID</th>
+            <th>Objective</th>
+            <th>Steps</th>
+            <th>Expected Result</th>
+            <th>Type</th>
+            <th>Priority</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody"></tbody>
+      </table>
+    </div>
+    <p class="preview-note" id="previewNote"></p>
+  </div>
+
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
