@@ -53,8 +53,15 @@
     <div class="step-label">Step 3 — Describe Feature / Module to Test</div>
     <textarea
       id="featureInput"
-      rows="3"
-      placeholder="e.g. MFA login for PAM admin users, vault password checkout flow, session recording, EPM elevation request approval...">
+      rows="5"
+      placeholder="Describe the scenario in detail. More detail = better test cases.
+      Example:
+      MFA login flow for PAM admin users covering:
+      - Valid login with TOTP
+      - Invalid OTP attempts and lockout
+      - Expired OTP handling
+      - Lost MFA device recovery
+      - MFA bypass attempts">
     </textarea>
   </div>
 
@@ -72,10 +79,6 @@
           <option value="boundary">Boundary</option>
           <option value="regression">Regression</option>
         </select>
-      </div>
-      <div class="option-group">
-        <label>Number of Test Cases</label>
-        <input type="number" id="tcCount" value="15" min="5" max="50"/>
       </div>
       <div class="option-group">
         <label>Priority Focus</label>

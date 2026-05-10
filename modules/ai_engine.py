@@ -1,5 +1,7 @@
 import google.generativeai as genai
 import json
+import time
+from modules.parser import split_into_chunks
 
 PRODUCT_KNOWLEDGE = {
 
@@ -49,7 +51,6 @@ PRODUCT_KNOWLEDGE = {
            - Active Directory / LDAP integration
            - RADIUS authentication support
            - Certificate-based authentication
-           - Biometric authentication support
            - Adaptive authentication based on risk score
            - Failed login lockout policies
            - Session token management and expiry
@@ -71,47 +72,35 @@ PRODUCT_KNOWLEDGE = {
            - Privileged access review and certification
            - Anomaly detection on session behavior
 
-        7. INTEGRATIONS
-           - ITSM integration (ServiceNow, Jira) for access request tickets
-           - SIEM integration for log forwarding
-           - Directory services (AD, LDAP, Azure AD)
-           - Cloud platforms (AWS, Azure, GCP) privileged access
-           - DevOps tools (Jenkins, Ansible, Terraform) secrets management
-           - API access for automation
-
         === KEY TEST SCENARIOS ===
         AUTHENTICATION: MFA bypass, brute force lockout, expired session reuse,
         token hijacking, SSO misconfiguration, certificate validation failure
 
-        AUTHORIZATION: Privilege escalation, horizontal access (user A accessing user B's vault),
-        RBAC bypass, JIT access after expiry, break-glass misuse
+        AUTHORIZATION: Privilege escalation, horizontal access, RBAC bypass,
+        JIT access after expiry, break-glass misuse
 
-        SESSION: Recording gaps, session hijacking mid-stream, clipboard exfiltration,
+        SESSION: Recording gaps, session hijacking, clipboard exfiltration,
         concurrent session limit bypass, admin termination latency
 
         VAULT: Password visible in logs, rotation failure, dual control bypass,
         checkout without approval, credential leak via API
 
-        AUDIT: Log tampering, missing audit entries, alert not triggered on violation,
+        AUDIT: Log tampering, missing audit entries, alert not triggered,
         SIEM log delay, compliance report inaccuracy
 
-        === COMMON EDGE CASES ===
+        === EDGE CASES ===
         - Network disconnect during active privileged session
         - Password rotation fails due to target system being offline
-        - Admin approves access for already-compromised account
-        - User checks out password and system goes into maintenance
         - Concurrent checkout by two users of same account
-        - Audit log storage full — what happens to new entries
+        - Audit log storage full
         - MFA device lost during active session
-        - Discovery scan finds 10,000+ accounts — performance test
-        - Break-glass used without actual emergency — detection
-        - Session recording playback of deleted session
+        - Break-glass used without actual emergency
     """,
 
     "EPM": """
         PRODUCT: EPM (Endpoint Privilege Management)
-        VENDOR CONTEXT: Removes local administrator rights from end-user workstations
-        and servers, controls application privilege elevation without giving full admin.
+        VENDOR CONTEXT: Removes local administrator rights from endpoints,
+        controls application privilege elevation without giving full admin.
 
         === CORE MODULES ===
 
@@ -120,313 +109,250 @@ PRODUCT_KNOWLEDGE = {
            - Enforce least privilege principle across endpoints
            - Detect and alert on re-added local admin accounts
            - Prevent users from adding themselves to admin groups
-           - Admin rights audit across all managed endpoints
-           - Baseline privilege policy enforcement
 
         2. APPLICATION CONTROL
            - Whitelist: only approved applications can run
            - Blacklist: explicitly blocked applications always denied
            - Greylist: unknown apps require approval before running
-           - Publisher-based rules (trust apps from specific vendors)
-           - Hash-based rules (trust specific file versions)
-           - Path-based rules (trust apps from specific locations)
-           - Network zone-based application rules
+           - Publisher-based rules
+           - Hash-based rules
+           - Path-based rules
            - Script control (PowerShell, VBScript, batch files)
-           - Browser extension control
            - DLL injection prevention
 
         3. ELEVATION MANAGEMENT
-           - On-demand elevation: user requests to run specific app as admin
-           - Self-service elevation with business justification
-           - Approval workflow: request goes to manager/IT for approval
-           - Time-limited elevation (e.g., 30 minutes only)
+           - On-demand elevation with business justification
+           - Approval workflow: request goes to manager/IT
+           - Time-limited elevation
            - Automatic elevation for pre-approved applications
-           - Elevation without exposing admin credentials to user
-           - Elevation audit trail (who elevated what, when, why)
+           - Elevation audit trail
            - Remote elevation approval via mobile app
-           - Emergency elevation with post-approval
 
-        4. POLICY MANAGEMENT
-           - Centralized policy creation and deployment
-           - Policy targeting by user, group, OU, machine
-           - Policy precedence and conflict resolution
-           - Policy versioning and rollback
-           - Real-time policy push vs scheduled sync
-           - Policy testing in audit mode before enforcement
-           - Group Policy integration
-
-        5. AGENT MANAGEMENT
-           - Lightweight agent installed on endpoints
-           - Agent tamper protection (cannot be stopped/uninstalled by standard user)
-           - Agent health monitoring and heartbeat
+        4. AGENT MANAGEMENT
+           - Agent tamper protection
            - Agent self-healing if killed
-           - Agent communication with server (online/offline mode)
-           - Offline policy caching (works without network)
+           - Offline policy caching
            - Agent upgrade and rollback
-           - Agent log collection
-
-        6. REPORTING & ANALYTICS
-           - Application usage reports
-           - Elevation request reports (approved, denied, pending)
-           - Policy violation reports
-           - Endpoint compliance score
-           - Risk-based endpoint ranking
-           - User behavior analytics
-           - Threat detection from elevation patterns
 
         === KEY TEST SCENARIOS ===
-        APPLICATION CONTROL: Blocked app execution, whitelisted app runs correctly,
-        unknown app handling, script execution blocking, publisher trust validation,
-        hash mismatch detection, path rule bypass attempt
+        APPLICATION CONTROL: Blocked app execution, whitelisted app runs,
+        unknown app handling, script execution blocking, hash mismatch detection
 
-        ELEVATION: Elevation without approval (should fail), elevation after approval,
-        elevation time expiry enforcement, credential exposure during elevation,
-        concurrent elevation requests, elevation on offline machine
+        ELEVATION: Elevation without approval fails, elevation after approval works,
+        elevation time expiry enforced, concurrent elevation requests
 
-        AGENT: Agent killed by user (should restart), agent uninstall by standard user (blocked),
-        policy sync when network restored, offline elevation enforcement,
-        agent on new machine auto-enrollment
+        AGENT: Agent killed by user restarts, agent uninstall blocked,
+        policy sync when network restored, offline enforcement
 
-        POLICY: Conflicting policy resolution, policy not applied to specific OU,
-        audit mode vs enforcement mode, policy rollback after bad deployment
-
-        === COMMON EDGE CASES ===
-        - User installs portable app (no installer) — hash rule bypass attempt
-        - Admin accidentally removes themselves from admin group
-        - Elevation approved but target app crashes immediately
-        - Policy deployed to wrong OU — mass impact
-        - Agent update breaks application control rules
+        === EDGE CASES ===
         - User renames blocked executable to bypass path rules
-        - Elevation request floods approval queue (100+ simultaneous)
+        - Elevation request floods approval queue
         - Offline laptop reconnects with 30-day-old policy
-        - Dual-boot machine — EPM only on one OS
-        - Virtual machine with snapshots — policy state after rollback
+        - Agent update breaks application control rules
     """,
 
     "CI": """
-        PRODUCT: CI (Compliance Intelligence / Continuous Intelligence)
-        VENDOR CONTEXT: Continuous monitoring platform that assesses infrastructure
-        against security policies, benchmarks, and compliance frameworks in real time.
+        PRODUCT: CI (Compliance Intelligence)
+        VENDOR CONTEXT: Continuous monitoring platform assessing infrastructure
+        against security policies and compliance frameworks in real time.
 
         === CORE MODULES ===
 
         1. POLICY & BENCHMARK MANAGEMENT
-           - Built-in frameworks: CIS Benchmarks, NIST, PCI-DSS, HIPAA, SOX, ISO 27001
-           - Custom policy creation with custom rules
-           - Policy versioning and change tracking
-           - Policy assignment to specific asset groups
+           - CIS Benchmarks, NIST, PCI-DSS, HIPAA, SOX, ISO 27001
+           - Custom policy creation
            - Policy exception management with approval workflow
-           - Policy conflict detection
-           - Benchmark scoring (pass/fail/warning per control)
+           - Benchmark scoring per control
 
         2. ASSET DISCOVERY & INVENTORY
            - Network scan-based asset discovery
-           - Agent-based discovery for managed endpoints
            - Cloud asset discovery (AWS, Azure, GCP)
-           - Asset classification (server, workstation, network device, cloud)
-           - Asset grouping and tagging
-           - Asset owner assignment
            - Rogue/unmanaged asset detection
            - Asset risk scoring
 
         3. COMPLIANCE SCANNING
-           - Scheduled scans (daily, weekly, monthly)
-           - On-demand scans triggered manually or via API
+           - Scheduled and on-demand scans
            - Agentless scanning via WMI, SSH, SNMP
-           - Agent-based scanning for real-time data
-           - Incremental scanning (only changed configurations)
-           - Scan scope targeting (specific IPs, subnets, OUs)
+           - Incremental scanning
            - Parallel scanning for large environments
-           - Scan performance impact control (throttling)
 
         4. RISK SCORING & DASHBOARD
            - Per-asset compliance score (0-100)
-           - Per-policy control pass/fail/exception status
-           - Environment-wide risk score
-           - Risk trend over time (improving/degrading)
-           - Executive dashboard with high-level metrics
-           - Drilldown from score to specific failed controls
+           - Environment-wide risk score and trend
+           - Executive dashboard with drilldown
            - Heatmap of riskiest assets
-           - Comparison across asset groups
 
         5. ALERTING & NOTIFICATIONS
-           - Real-time alerts on new policy violations
-           - Alert severity classification (critical, high, medium, low)
-           - Alert routing to specific teams/owners
-           - Email, SMS, webhook notification channels
-           - Alert suppression for known exceptions
-           - Alert escalation if unresolved after N days
-           - SIEM integration for alert forwarding
-           - Alert deduplication
-
-        6. REMEDIATION MANAGEMENT
-           - Remediation guidance per failed control
-           - Automated remediation scripts (optional)
-           - Remediation ticket creation in ITSM (ServiceNow)
-           - Remediation tracking and SLA monitoring
-           - Verification scan after remediation
-           - Remediation history audit trail
-
-        7. REPORTING
-           - Scheduled compliance reports
-           - On-demand report generation
-           - Report formats: PDF, Excel, CSV
-           - Executive summary vs technical detail reports
-           - Trend reports over time periods
-           - Evidence collection for auditors
-           - Custom report builder
+           - Real-time alerts on policy violations
+           - Alert severity classification
+           - Alert routing to specific teams
+           - SIEM integration
 
         === KEY TEST SCENARIOS ===
-        SCANNING: Scan detects real misconfiguration, scan misses known violation (false negative),
-        scan flags compliant config as violation (false positive), scan performance on 10,000 assets,
-        agentless scan on locked-down firewall, scan of cloud assets
+        SCANNING: Detects real misconfiguration, false negative check,
+        false positive check, performance on large environment
 
-        ALERTING: Alert fires on new violation, no alert on exception, alert routing to correct owner,
-        duplicate alert suppression, SIEM receives alert within SLA, escalation after timeout
+        ALERTING: Alert fires on violation, no alert on approved exception,
+        correct routing, SIEM receives within SLA
 
-        DASHBOARD: Score reflects real-time scan, drilldown shows correct assets,
-        trend graph accurate, executive vs technical view, multi-tenant data isolation
-
-        REMEDIATION: Ticket created on violation, score improves after fix, verification scan runs,
-        SLA breach escalation, false remediation marked complete
-
-        === COMMON EDGE CASES ===
-        - Scan runs during system maintenance window — impact
-        - Asset decommissioned but still appears in dashboard
-        - Policy exception expires — violation should reappear
-        - 10,000 simultaneous scan targets — performance
-        - Cloud asset spun up mid-scan — included or missed
-        - Custom policy with conflicting rules — which wins
-        - Remediation script causes system instability
-        - Score changes without any actual configuration change
-        - Audit report generated during active scan — data consistency
-        - Network partition during scan — partial results handling
+        === EDGE CASES ===
+        - Asset decommissioned but still in dashboard
+        - Policy exception expires — violation reappears
+        - Score changes without configuration change
+        - Audit report during active scan — data consistency
     """,
 
     "MyVault": """
-        PRODUCT: MyVault (Personal Password Vault / Enterprise Password Manager)
-        VENDOR CONTEXT: Secure personal credential management for end users within
-        an organization. Allows employees to store, manage, and share credentials securely.
+        PRODUCT: MyVault (Personal Password Vault)
+        VENDOR CONTEXT: Secure personal credential management for end users
+        within an organization.
 
         === CORE MODULES ===
 
         1. VAULT & CREDENTIAL STORAGE
-           - Encrypted credential storage (AES-256 at rest)
-           - Store types: username/password, credit card, secure notes, SSH keys, API keys
-           - Folder/category organization
-           - Tagging and search
-           - Favorite/pin credentials
-           - Custom fields per credential
-           - Credential history (last N versions)
-           - Import credentials from CSV, browser export, other managers
-           - Export credentials (encrypted backup)
-           - Bulk operations (move, delete, tag)
+           - AES-256 encrypted storage
+           - Credential history tracking
+           - Import from CSV, browser export
+           - Encrypted backup export
 
         2. MASTER PASSWORD & AUTHENTICATION
-           - Master password known only to user (zero-knowledge architecture)
-           - Master password never stored or transmitted in plain text
-           - PBKDF2 / bcrypt key derivation for master password
-           - Master password strength enforcement
-           - Master password hint (no actual password stored)
-           - Emergency access request (trusted contact can request access)
-           - Master password reset via identity verification
-           - MFA on vault login (TOTP, hardware key, push notification)
-           - Biometric unlock (fingerprint, face ID on mobile)
-           - PIN unlock for quick access
+           - Zero-knowledge architecture
+           - Master password never stored or transmitted
+           - MFA on vault login (TOTP, hardware key)
+           - Biometric unlock on mobile
+           - Emergency access via trusted contact
 
         3. AUTO-FILL & BROWSER INTEGRATION
-           - Browser extension for Chrome, Firefox, Edge
-           - Auto-detect login forms and suggest credentials
-           - Auto-fill username and password
-           - Auto-submit option
-           - Multiple accounts per website handling
-           - Phishing protection (only fills on correct domain)
-           - Never auto-fill on HTTP sites (HTTPS only)
-           - Custom auto-fill rules per site
-           - Mobile app auto-fill integration (iOS, Android)
+           - Phishing protection — fills only on correct domain
+           - Never auto-fill on HTTP sites
+           - Multiple accounts per website support
 
-        4. PASSWORD GENERATOR
-           - Configurable length (8-128 characters)
-           - Character set options (uppercase, lowercase, numbers, symbols)
-           - Exclude ambiguous characters option
-           - Pronounceable password option
-           - Passphrase generator (word-based)
-           - Password strength meter
-           - Generated password history
-           - One-click copy without displaying
+        4. SECURE SHARING
+           - Read-only vs edit permissions
+           - Time-limited sharing with auto-expiry
+           - Owner can revoke anytime
+           - Recipient cannot re-share
 
-        5. SECURE SHARING
-           - Share individual credentials with specific users
-           - Share folder/collection with team
-           - Read-only vs edit sharing permissions
-           - Time-limited sharing (auto-expires)
-           - Recipient gets notification
-           - Shared credential — owner can revoke anytime
-           - Shared credential — recipient cannot re-share
-           - Share via secure link (one-time access)
-           - Organization-wide shared vault (admin managed)
-
-        6. SECURITY FEATURES
-           - Vault lock on inactivity timeout (configurable)
-           - Auto-lock when browser/app closes
+        5. SECURITY FEATURES
+           - Vault lock on inactivity timeout
            - Clipboard auto-clear after N seconds
-           - Password health check (weak, reused, old, breached)
-           - Have I Been Pwned integration (breach detection)
-           - Security score dashboard
-           - Two-factor authentication enforcement by admin
+           - Have I Been Pwned breach detection
            - Screen capture protection on mobile
-           - Jailbreak/root detection on mobile
-
-        7. ADMIN & ENTERPRISE FEATURES
-           - Centralized admin console
-           - Force MFA policy across all users
-           - Inactivity timeout policy enforcement
-           - Restrict sharing outside organization
-           - Monitor vault health scores across users
-           - Offboarding: transfer credentials on user departure
-           - SSO integration for vault login
-           - Directory sync (AD/LDAP) for user provisioning
-           - Audit logs for admin actions
-           - Data residency and sovereignty controls
 
         === KEY TEST SCENARIOS ===
-        AUTHENTICATION: Master password wrong N times lockout, MFA device lost recovery,
-        biometric spoofing attempt, session token reuse after logout, SSO bypass to vault
+        AUTHENTICATION: Wrong master password lockout,
+        MFA device lost recovery, token reuse after logout
 
-        STORAGE: Credential save with special characters, import 10,000 credentials performance,
-        export encrypted backup and restore, custom field with max characters, duplicate URL handling
+        SHARING: Revoke access — recipient denied immediately,
+        read-only share edit blocked, expired share inaccessible
 
-        AUTO-FILL: Fill on correct domain, no fill on lookalike phishing domain,
-        HTTP site fill blocked, multiple accounts same domain, auto-fill in iframe
-
-        SHARING: Share then revoke — recipient access immediately denied,
-        read-only share — edit blocked, time-expired share no longer accessible,
-        re-share attempt by recipient blocked, shared credential password changed by owner
-
-        SECURITY: Vault lock after inactivity, clipboard cleared after timeout,
-        breach alert for compromised password, weak password flagged, screen recording blocked
-
-        === COMMON EDGE CASES ===
-        - Master password forgotten with no recovery method set up
-        - User account deactivated while vault has shared credentials
-        - Import CSV with malformed data (XSS in credential name)
-        - Auto-fill triggered on custom enterprise app (not a browser)
-        - Two users share same credential — owner changes password — recipient sees new?
-        - Vault accessed from new country — suspicious login alert
-        - Credential shared via link — link forwarded to unauthorized person
-        - MFA app uninstalled — cannot login — recovery flow
-        - Admin forces password reset — does vault master password reset too?
-        - Offline access to vault — cached credentials security
-        - Device stolen — remote vault wipe capability
-        - Browser extension update breaks auto-fill — rollback
+        === EDGE CASES ===
+        - Master password forgotten with no recovery set up
+        - Import CSV with malformed or malicious data
+        - Owner changes shared credential password
+        - Vault accessed from new country — suspicious login
+        - Device stolen — remote vault wipe
     """
 }
 
-def generate_test_cases(product, feature, test_type, count, doc_text, api_key):
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
 
-    product_context = PRODUCT_KNOWLEDGE.get(product, "")
+def safe_parse_json(raw):
+    """Safely parses JSON even if AI response is incomplete"""
+    raw = raw.strip()
+
+    # Remove markdown code blocks if present
+    if "```" in raw:
+        parts = raw.split("```")
+        for part in parts:
+            stripped = part.strip()
+            if stripped.startswith("json"):
+                stripped = stripped[4:].strip()
+            if stripped.startswith("["):
+                raw = stripped
+                break
+
+    raw = raw.strip()
+
+    # Try full parse first
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # AI hit token limit mid-response — fix incomplete JSON
+    try:
+        last_complete = raw.rfind('},')
+        if last_complete == -1:
+            last_complete = raw.rfind('}')
+        if last_complete != -1:
+            fixed = raw[:last_complete + 1] + ']'
+            return json.loads(fixed)
+    except:
+        pass
+
+    return []
+
+
+def remove_duplicates(all_cases):
+    """Remove duplicate test cases based on objective similarity"""
+    seen_objectives = set()
+    unique_cases = []
+
+    for tc in all_cases:
+        objective = tc.get('objective', '').lower().strip()
+        # Check if very similar objective already exists
+        is_duplicate = False
+        for seen in seen_objectives:
+            # Simple duplicate check — first 60 chars match
+            if objective[:60] == seen[:60]:
+                is_duplicate = True
+                break
+
+        if not is_duplicate:
+            seen_objectives.add(objective)
+            unique_cases.append(tc)
+
+    return unique_cases
+
+
+def renumber_cases(cases, product):
+    """Renumber all test cases sequentially after combining chunks"""
+    from datetime import datetime
+    today = datetime.now().strftime('%d/%m/%Y')
+
+    for i, tc in enumerate(cases, 1):
+        tc['serial'] = i
+        tc['tc_id'] = f"TC-{product.upper()}-{str(i).zfill(3)}"
+        tc['suite_id'] = f"TS-{product.upper()}-001"
+        tc['date'] = today
+
+    return cases
+
+
+def call_gemini(client, prompt):
+    """Single API call to Gemini with retry on rate limit"""
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = client.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            error_msg = str(e)
+            if '429' in error_msg or 'quota' in error_msg.lower():
+                wait_time = 30 * (attempt + 1)
+                print(f"Rate limit hit. Waiting {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                raise e
+    raise Exception("Gemini API rate limit exceeded after retries.")
+
+
+def generate_for_chunk(client, product, feature, test_type,
+                       chunk_text, chunk_num, total_chunks, product_context):
+    """Generate test cases for a single document chunk"""
+
+    from datetime import datetime
+    today = datetime.now().strftime('%d/%m/%Y')
 
     type_instruction = (
         "Mix of Functional, Security, Negative, Boundary, Regression."
@@ -434,56 +360,153 @@ def generate_test_cases(product, feature, test_type, count, doc_text, api_key):
         else f"Focus only on {test_type} test cases."
     )
 
-    from datetime import datetime
-    today = datetime.now().strftime('%d/%m/%Y')
+    chunk_info = (
+        f"This is chunk {chunk_num} of {total_chunks} of the full document."
+        if total_chunks > 1
+        else "This is the complete document."
+    )
 
-    prompt = f"""You are a Senior QA Engineer and Security Tester with expertise in cybersecurity products.
+    prompt = f"""You are a Senior QA Engineer and Security Tester with deep expertise in cybersecurity products.
 
 === PRODUCT KNOWLEDGE ===
 {product_context}
 
-=== FEATURE TO TEST ===
+=== FEATURE / SCENARIO TO TEST ===
 {feature}
 
-=== DOCUMENT CONTENT ===
-{doc_text if doc_text else "No document uploaded. Use product knowledge above."}
+=== DOCUMENT SECTION ===
+{chunk_info}
+{chunk_text}
 
 === INSTRUCTIONS ===
-- Think like both an attacker and a tester
-- Generate exactly {count} test cases
+- Read the document section above carefully
+- Generate test cases ONLY for what is described in this document section
+- DO NOT invent scenarios not mentioned in the document
+- If document section mentions a feature — generate ALL possible test cases for it
 - Test type: {type_instruction}
-- Cover: authentication, authorization, session management, audit logging, encryption, privilege escalation
-- Make steps specific enough for a junior tester to execute
-- Include both positive AND negative scenarios
+- Think like both an attacker and a tester
+- Cover for each feature:
+    * Happy path (positive)
+    * Wrong/invalid input (negative)
+    * Empty/null/boundary values (boundary)
+    * Unauthorized access attempt (security)
+    * Session timeout / expiry scenarios (edge case)
+    * Concurrent usage (edge case)
+- Make steps specific and executable for a junior tester
+- Make test data realistic with actual values
+- Do NOT add a fixed count — generate as many as the content requires
+
+=== OUTPUT FORMAT ===
+Return ONLY a valid JSON array. No explanation. No markdown. No backticks.
+Start with [ and end with ]
+Each object must have exactly these keys:
+{{
+  "serial": 1,
+  "date": "{today}",
+  "suite_id": "TS-{product.upper()}-001",
+  "tc_id": "TC-{product.upper()}-001",
+  "objective": "one sentence what this test proves",
+  "preconditions": "what must be set up before running",
+  "steps": "1. Step one 2. Step two 3. Step three",
+  "test_data": "actual input values to use",
+  "expected_result": "exact expected outcome",
+  "actual_result": "",
+  "status": "",
+  "remarks": ""
+}}"""
+
+    raw = call_gemini(client, prompt)
+    cases = safe_parse_json(raw)
+    return cases
+
+
+def generate_test_cases(product, feature, test_type, doc_text, api_key):
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-2.5-flash')
+
+    product_context = PRODUCT_KNOWLEDGE.get(product, "")
+    all_test_cases = []
+
+    if doc_text:
+        # Split full document into chunks
+        chunks = split_into_chunks(doc_text, chunk_size=8000, overlap=500)
+        total_chunks = len(chunks)
+
+        print(f"Document split into {total_chunks} chunk(s). Processing...")
+
+        for i, chunk in enumerate(chunks, 1):
+            print(f"Processing chunk {i} of {total_chunks}...")
+
+            cases = generate_for_chunk(
+                model, product, feature, test_type,
+                chunk, i, total_chunks, product_context
+            )
+
+            all_test_cases.extend(cases)
+            print(f"Chunk {i} generated {len(cases)} test cases.")
+
+            # Delay between chunks to avoid rate limiting
+            if i < total_chunks:
+                print("Waiting 10 seconds before next chunk...")
+                time.sleep(10)
+
+    else:
+        # No document — generate from feature description + product knowledge
+        print("No document uploaded. Generating from feature description...")
+
+        from datetime import datetime
+        today = datetime.now().strftime('%d/%m/%Y')
+
+        type_instruction = (
+            "Mix of Functional, Security, Negative, Boundary, Regression."
+            if test_type == "all"
+            else f"Focus only on {test_type} test cases."
+        )
+
+        prompt = f"""You are a Senior QA Engineer and Security Tester with deep expertise in cybersecurity products.
+
+=== PRODUCT KNOWLEDGE ===
+{product_context}
+
+=== FEATURE / SCENARIO TO TEST ===
+{feature}
+
+=== INSTRUCTIONS ===
+- Analyze the feature/scenario deeply
+- Generate ALL possible test cases this scenario requires
+- Test type: {type_instruction}
+- Think like both an attacker and a tester
+- Cover: happy path, negative, boundary, security, edge cases
+- Make steps executable for a junior tester
 - Make test data realistic
 
 === OUTPUT FORMAT ===
 Return ONLY a valid JSON array. No explanation. No markdown. No backticks.
+Start with [ and end with ]
 Each object must have exactly these keys:
-- "serial": number starting from 1
-- "date": "{today}"
-- "suite_id": like "TS-{product.upper()}-001"
-- "tc_id": like "TC-{product.upper()}-001" increment for each
-- "objective": one sentence what this test proves
-- "preconditions": what must be set up before running
-- "steps": numbered steps as a single string
-- "test_data": actual input values to use
-- "expected_result": exact expected outcome
-- "actual_result": ""
-- "status": ""
-- "remarks": ""
+{{
+  "serial": 1,
+  "date": "{today}",
+  "suite_id": "TS-{product.upper()}-001",
+  "tc_id": "TC-{product.upper()}-001",
+  "objective": "one sentence what this test proves",
+  "preconditions": "what must be set up before running",
+  "steps": "1. Step one 2. Step two 3. Step three",
+  "test_data": "actual input values to use",
+  "expected_result": "exact expected outcome",
+  "actual_result": "",
+  "status": "",
+  "remarks": ""
+}}"""
 
-Start response with [ and end with ]"""
+        raw = call_gemini(model, prompt)
+        all_test_cases = safe_parse_json(raw)
 
-    response = model.generate_content(prompt)
-    raw = response.text.strip()
+    # Remove duplicates across chunks
+    all_test_cases = remove_duplicates(all_test_cases)
 
-    # Clean if AI adds markdown
-    if "```" in raw:
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    raw = raw.strip()
+    # Renumber everything cleanly 001, 002, 003...
+    all_test_cases = renumber_cases(all_test_cases, product)
 
-    test_cases = json.loads(raw)
-    return test_cases
+    print(f"Total unique test cases generated: {len(all_test_cases)}")
+    return all_test_cases
