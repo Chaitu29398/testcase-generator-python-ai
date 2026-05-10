@@ -65,7 +65,6 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   formData.append('product',    selectedProduct);
   formData.append('feature',    feature);
   formData.append('test_type',  document.getElementById('testType').value);
-  formData.append('count',      document.getElementById('tcCount').value);
   formData.append('priority',   document.getElementById('priority').value);
 
   if (uploadedFile) {
@@ -84,8 +83,8 @@ document.getElementById('generateBtn').addEventListener('click', async () => {
   errorBar.classList.add('hidden');
   resultCard.classList.add('hidden');
   statusText.textContent = uploadedFile
-    ? 'Reading document and generating test cases...'
-    : 'Generating test cases with AI...';
+    ? 'Reading full document and generating test cases (large docs may take more time)...'
+    : 'Generating test cases from scenario...';
 
   try {
     const res  = await fetch('/generate', { method: 'POST', body: formData });
